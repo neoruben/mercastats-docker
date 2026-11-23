@@ -15,11 +15,11 @@ Esta guía explica cómo desplegar la versión web self-hosted de **MercaStats**
 
 ## 2. Instalación con Docker Compose
 
-Los pasos están en el [README](../README.md#instalación): un `docker-compose.yml` con la imagen `ghcr.io/neoruben/mercastats:latest` y `docker compose up -d`.
+Los pasos están en el [README](../README.md#instalación): un `docker-compose.yml` con la imagen `ghcr.io/neoruben/mercastats:latest`, un `.env` con la configuración y `docker compose up -d`.
+
+El compose lee el `.env` con `env_file` (`required: false`, así que arranca aunque no exista; hace falta Docker Compose 2.24 o más reciente). También se pueden poner las variables en `environment:` del compose; si una está en los dos sitios, gana la de `environment:`.
 
 La carpeta de datos (`./data` y `./data/inbox`) se crea sola en el primer arranque. El contenedor arranca como root solo para crearla y darle como dueño `PUID:PGID` (por defecto `1000:1000`); después el servidor funciona con ese usuario, nunca como root. Si prefieres que no arranque nunca como root, añade `user: "1000:1000"` al compose y crea tú la carpeta `data` con ese usuario.
-
-Las variables de entorno se pueden poner en `environment:` del compose o en un archivo `.env` con `env_file: .env` (plantilla en [`.env.example`](../.env.example)).
 
 ---
 

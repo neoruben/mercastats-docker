@@ -1,4 +1,5 @@
-# Ejemplo de docker-compose.yml para MercaStats. Explicación en el README.
+# docker-compose.yml de MercaStats. Cópialo tal cual; tu configuración va en el archivo .env
+# (plantilla en .env.example). Explicación completa en el README.
 services:
   mercastats:
     image: ghcr.io/neoruben/mercastats:latest
@@ -7,24 +8,10 @@ services:
     ports:
       # Puerto del equipo : puerto del contenedor. Cambia el primero si el 8080 está ocupado.
       - "8080:8080"
-    environment:
-      - TZ=Europe/Madrid
-      # Contraseña del usuario admin. Solo cuenta si está puesta en el PRIMER arranque;
-      # si no, se genera una y aparece en los logs. Después se cambia desde la web.
-      # - ADMIN_PASSWORD=una-contraseña-larga
-
-      # Leer los tickets del correo (contraseña de aplicación, no la de tu cuenta)
-      # - IMAP_HOST=imap.gmail.com
-      # - IMAP_USER=tu_correo@gmail.com
-      # - IMAP_PASSWORD=xxxx xxxx xxxx xxxx
-      # - IMAP_FOLDER=Tickets/Mercadona
-
-      # Usuario y grupo dueños de la carpeta data (por defecto 1000)
-      # - PUID=1000
-      # - PGID=1000
-
-      # Menos memoria (recomendado en Raspberry Pi)
-      # - JAVA_OPTS=-Xmx256m -XX:+UseSerialGC
+    env_file:
+      # Lee la configuración del .env de esta carpeta (si no existe, arranca igual)
+      - path: .env
+        required: false
     volumes:
       # Base de datos y carpeta vigilada (data/inbox). Se crea sola.
       - ./data:/data
