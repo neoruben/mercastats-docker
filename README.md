@@ -18,33 +18,53 @@ Versión web para servidor propio de MercaStats: estadísticas de tus tickets de
 
 ## Instalación con Docker Compose, paso a paso
 
-Necesitas Docker con el plugin Compose (`docker compose version` debe responder) y unos 300 MB de RAM libres.
+La imagen está publicada en GitHub:
 
-### 1. Descarga el código
-
-El repositorio es privado: al clonar, GitHub te pide tu usuario y, como contraseña, un **token de acceso** (GitHub → Settings → Developer settings → Personal access tokens), no la contraseña de la cuenta.
-
-```bash
-git clone https://github.com/neoruben/mercastats-docker.git
-cd mercastats-docker
+```text
+ghcr.io/neoruben/mercastats:latest
 ```
 
-### 2. Crea el `docker-compose.yml`
+No hace falta descargar el código: basta con un `docker-compose.yml` y un `.env`. Necesitas Docker con el plugin Compose (`docker compose version` debe responder) y unos 300 MB de RAM libres.
+
+### 1. Inicia sesión en GitHub desde Docker (solo mientras la imagen sea privada)
+
+La imagen todavía es privada, así que Docker necesita permiso para descargarla. Se hace una sola vez en cada equipo:
+
+1. En GitHub, ve a tu foto → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**.
+2. Ponle un nombre (por ejemplo `Docker`), elige la caducidad y marca **solo** `read:packages`. Los tokens «Fine-grained» no sirven para esto.
+3. Pulsa **Generate token** y copia el token (empieza por `ghp_`; solo se muestra una vez).
+4. En el equipo donde vas a instalar MercaStats:
+
+   ```bash
+   docker login ghcr.io -u TU_USUARIO_DE_GITHUB
+   ```
+
+   Cuando pida `Password:`, pega el token (no se ve al pegarlo) y pulsa Enter. Debe responder `Login Succeeded`.
+
+### 2. Crea una carpeta para MercaStats
 
 ```bash
-cp docker-compose.example.yml docker-compose.yml
+mkdir -p mercastats/data/inbox
+cd mercastats
 ```
 
-Queda así (puedes copiarlo tal cual):
+`data/` guardará la base de datos y `data/inbox` es la carpeta vigilada donde puedes dejar PDFs.
+
+### 3. Crea el `docker-compose.yml`
+
+```bash
+nano docker-compose.yml
+```
+
+Pega esto:
 
 ```yaml
 services:
   mercastats:
-    build: .                     # compila la imagen con el código de esta carpeta
-    image: mercastats:local
+    image: ghcr.io/neoruben/mercastats:latest
     container_name: mercastats
     restart: unless-stopped
-    # user: "1000:1000"          # opcional, ver paso 4
+    user: "1000:1000"            # tu UID:GID (ver paso 5)
     ports:
       - "8080:8080"              # puerto del equipo : puerto del contenedor
     env_file:
@@ -65,57 +85,55 @@ Lo que puedes cambiar:
 | Abrirla solo desde el propio equipo | `ports` | `"127.0.0.1:8080:8080"` |
 | Memoria en una Raspberry Pi | descomenta `JAVA_OPTS` y `mem_limit` | |
 | Dónde se guardan los datos | parte izquierda de `volumes` | `/srv/mercastats:/data` |
+| Fijar una versión en lugar de la última | etiqueta de `image` | `ghcr.io/neoruben/mercastats:0.1.0` |
 
-### 3. Crea el `.env`
+### 4. Crea el `.env`
 
 ```bash
-cp .env.example .env
 nano .env
 ```
 
-Lo mínimo es cambiar la contraseña del administrador:
+Lo mínimo es la contraseña del administrador:
 
 ```ini
 ADMIN_USER=admin
 ADMIN_PASSWORD=pon-aqui-una-contraseña-larga
 ```
 
-Para que lea los tickets del correo automáticamente, descomenta y rellena también la parte de IMAP. Con Gmail:
+Para que lea los tickets del correo automáticamente, añade la parte de IMAP. Con Gmail:
 
 ```ini
 IMAP_HOST=imap.gmail.com
 IMAP_USER=tu_correo@gmail.com
-IMAP_PASSWORD=xxxx xxxx xxxx xxxx    # contraseña de aplicación, no la de tu cuenta
-IMAP_FOLDER=Tickets/Mercadona        # etiqueta de Gmail donde guardas los tickets
+IMAP_PASSWORD=xxxx xxxx xxxx xxxx
+IMAP_FOLDER=Tickets/Mercadona
 IMAP_SYNC_INTERVAL_MINUTES=60
 ```
 
-Cómo sacar la contraseña de aplicación de Gmail o iCloud: [docs/DOCKER.md, apartado 6](docs/DOCKER.md#6-cómo-crear-una-contraseña-de-aplicación-imap). El `.env` tiene contraseñas: no lo compartas ni lo subas a ningún sitio.
+- `IMAP_PASSWORD` es una **contraseña de aplicación**, no la de tu cuenta. Cómo crearla en Gmail o iCloud: [docs/DOCKER.md, apartado 6](docs/DOCKER.md#6-cómo-crear-una-contraseña-de-aplicación-imap).
+- `IMAP_FOLDER` es la etiqueta de Gmail donde guardas los tickets (si está dentro de otra, con `/`). Para buscar en todo el correo: `[Gmail]/Todos`. La etiqueta tiene que tener activado «Mostrar en IMAP» en la configuración de Gmail.
+- El resto de opciones están en [`.env.example`](.env.example) y en [docs/DOCKER.md](docs/DOCKER.md#5-variables-de-entorno).
 
-### 4. Prepara la carpeta de datos
+El `.env` tiene contraseñas: no lo compartas ni lo subas a ningún sitio.
 
-El contenedor no se ejecuta como root, sino con el usuario `10001`. Elige una de estas dos opciones:
+### 5. Permisos de la carpeta de datos
 
-- **Opción A (sencilla):** la carpeta pasa a ser del usuario del contenedor.
+El contenedor no se ejecuta como root, así que la carpeta `data` tiene que ser del usuario con el que corre:
+
+- **Con `user: "1000:1000"`** (como en el paso 3): el contenedor corre con tu usuario y la carpeta sigue siendo tuya, así que puedes copiar PDFs a `data/inbox` sin `sudo`. Comprueba tu UID y GID con `id`; si no son `1000`, cámbialos en el compose. Si creaste la carpeta tú en el paso 2, no hay nada más que hacer.
+- **Sin la línea `user:`**: el contenedor corre con el usuario `10001` y tienes que darle la carpeta:
 
   ```bash
-  mkdir -p data/inbox
   sudo chown -R 10001:10001 data
   ```
 
-- **Opción B:** la carpeta sigue siendo tuya, así puedes copiar PDFs a `data/inbox` sin `sudo`. Mira tu UID y GID con `id` (normalmente `1000`), descomenta `user: "1000:1000"` en el `docker-compose.yml` y crea la carpeta:
-
-  ```bash
-  mkdir -p data/inbox
-  ```
-
-### 5. Arranca
+### 6. Arranca
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-La primera vez tarda varios minutos porque compila la imagen; las siguientes, mucho menos. Comprueba que ha arrancado:
+Comprueba que ha arrancado:
 
 ```bash
 docker compose ps
@@ -124,15 +142,43 @@ docker compose logs -f mercastats
 
 Cuando en `ps` aparezca `healthy`, abre `http://IP-del-equipo:8080` (o `http://localhost:8080` en el propio equipo) y entra con `admin` y la contraseña del `.env`.
 
-### 6. Importa tus tickets
+### 7. Importa tus tickets
 
-- Pulsa **Sincronizar** (arriba) para leer el correo y la carpeta vigilada.
-- O pulsa **Importar** y arrastra los PDFs, o elígelos desde el móvil: se cargan solos.
+- Si configuraste IMAP, la primera sincronización **empieza sola al arrancar** y los tickets van apareciendo en la web (con unos 200 tickets tarda unos minutos). Después se repite cada `IMAP_SYNC_INTERVAL_MINUTES`.
+- El botón **Sincronizar** (arriba) la lanza cuando quieras.
+- Con **Importar** puedes arrastrar PDFs o elegirlos desde el móvil: se cargan solos.
 - O copia los PDFs en `data/inbox`: en menos de un minuto aparecen en la web.
 
-### Con Dockge o Portainer
+---
 
-Crea un stack nuevo, pega el `docker-compose.yml` del paso 2 cambiando `build: .` por la ruta completa de la carpeta donde clonaste el código (por ejemplo `build: /home/usuario/mercastats-docker`), pega el contenido del `.env` en el apartado de variables o junto al compose, y despliega.
+## Instalación con Dockge o Portainer
+
+Usa el mismo compose del paso 3 y el mismo `.env` del paso 4, con dos diferencias:
+
+**1. El gestor también tiene que poder descargar la imagen privada.** Dockge y Portainer corren en su propio contenedor y no ven el `docker login` que hiciste en el equipo.
+
+- **Dockge:** añade esta línea en los `volumes:` del compose de Dockge y reinícialo (`docker compose up -d` en su carpeta). Cambia `TU_USUARIO` por tu usuario del equipo:
+
+  ```yaml
+        - /home/TU_USUARIO/.docker/config.json:/root/.docker/config.json:ro
+  ```
+
+- **Portainer:** ve a **Registries** → **Add registry** → **Custom registry**, con URL `ghcr.io`, tu usuario de GitHub y el token como contraseña.
+
+**2. La carpeta de datos la crea el gestor como root**, así que hay que darle permisos antes de desplegar.
+
+Pasos en Dockge:
+
+1. Pulsa **+ Componer** y ponle de nombre `mercastats`.
+2. Pega el compose del paso 3 y, en el cuadro `.env`, el contenido del paso 4.
+3. Pulsa **Guardar**, todavía no **Desplegar**.
+4. En una terminal del equipo, crea la carpeta de datos con tu usuario (cambia la ruta si tus stacks no están en `/opt/stacks`):
+
+   ```bash
+   sudo install -d -o 1000 -g 1000 /opt/stacks/mercastats/data /opt/stacks/mercastats/data/inbox
+   ```
+
+5. Pulsa **Desplegar** y sigue desde el paso 6.
 
 ---
 
@@ -141,9 +187,11 @@ Crea un stack nuevo, pega el `docker-compose.yml` del paso 2 cambiando `build: .
 **Actualizar a la última versión** (los datos se conservan):
 
 ```bash
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+En Dockge, con el botón **Actualizar** del stack.
 
 **Copia de seguridad:** todo está en `data/mercastats.db`. Para copiarlo con el contenedor en marcha:
 
@@ -164,11 +212,26 @@ docker compose down      # quitar el contenedor (los datos de data/ se conservan
 
 | Síntoma | Solución |
 |---|---|
-| En los logs: `AccessDeniedException` o no puede crear `/data/...` | Permisos de `data`: repite el paso 4 |
+| `denied` o `unauthorized` al descargar la imagen | Falta el `docker login` del paso 1 (o, en Dockge y Portainer, darles acceso al registro) |
+| En los logs: `AccessDeniedException` o no puede crear `/data/...` | Permisos de `data`: repasa el paso 5 |
 | `port is already allocated` | Ese puerto ya lo usa otro contenedor: cambia el primer número de `ports` |
 | He cambiado `ADMIN_PASSWORD` en el `.env` y no entra con la nueva | `ADMIN_PASSWORD` solo se usa al crear el administrador en el primer arranque; después la contraseña se cambia desde la web, en **Cambiar contraseña** |
-| No importa nada del correo | Revisa `IMAP_FOLDER` (las etiquetas de Gmail deben tener activado «Mostrar en IMAP») y mira los logs |
+| No importa nada del correo | Revisa `IMAP_FOLDER` (la etiqueta debe tener activado «Mostrar en IMAP») y mira los logs |
 | Se cierra solo en la Raspberry Pi | Activa `JAVA_OPTS` y `mem_limit` |
+
+---
+
+## Compilar la imagen desde el código
+
+Si prefieres no usar la imagen publicada:
+
+```bash
+git clone https://github.com/neoruben/mercastats-docker.git
+cd mercastats-docker
+cp docker-compose.example.yml docker-compose.yml
+```
+
+En `docker-compose.yml` cambia la línea `image:` por `build: .` y arranca con `docker compose up -d --build` (la primera vez tarda varios minutos). Para actualizar: `git pull && docker compose up -d --build`.
 
 ---
 

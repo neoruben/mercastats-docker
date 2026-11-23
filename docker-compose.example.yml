@@ -1,10 +1,9 @@
 services:
   mercastats:
-    # Compila la imagen a partir del código de esta carpeta (la primera vez tarda unos minutos).
-    build: .
-    image: mercastats:local
-    # Si usas la imagen publicada en GitHub, borra las dos líneas anteriores y descomenta esta:
-    # image: ghcr.io/neoruben/mercastats:latest
+    # Imagen publicada en GitHub (mientras sea privada, antes haz `docker login ghcr.io`).
+    image: ghcr.io/neoruben/mercastats:latest
+    # Para compilarla tú a partir del código de esta carpeta, cambia la línea anterior por:
+    # build: .
     container_name: mercastats
     restart: unless-stopped
     # Opcional: ejecutar con tu usuario para que la carpeta data/ siga siendo tuya

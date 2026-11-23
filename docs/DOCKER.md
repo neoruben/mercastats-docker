@@ -15,21 +15,19 @@ Esta guía explica cómo desplegar la versión web self-hosted de **MercaStats**
 
 ## 2. Instalación con Docker Compose
 
-Los pasos detallados (descargar el código, `docker-compose.yml`, `.env`, permisos de `data/`, arrancar, Dockge/Portainer y problemas frecuentes) están en el [README](../README.md#instalación-con-docker-compose-paso-a-paso).
+Los pasos detallados (inicio de sesión en GitHub, `docker-compose.yml`, `.env`, permisos de `data/`, arrancar, Dockge/Portainer y problemas frecuentes) están en el [README](../README.md#instalación-con-docker-compose-paso-a-paso).
 
-En resumen:
+En resumen, en una carpeta nueva:
 
 ```bash
-git clone https://github.com/neoruben/mercastats-docker.git && cd mercastats-docker
-cp docker-compose.example.yml docker-compose.yml
-cp .env.example .env            # pon al menos ADMIN_PASSWORD
-mkdir -p data/inbox && sudo chown -R 10001:10001 data
-docker compose up -d --build
+docker login ghcr.io -u TU_USUARIO_DE_GITHUB   # mientras la imagen sea privada
+mkdir -p data/inbox
+nano docker-compose.yml                       # con image: ghcr.io/neoruben/mercastats:latest
+nano .env                                     # al menos ADMIN_PASSWORD
+docker compose up -d
 ```
 
-### Usar la imagen publicada
-
-Si se ha publicado una versión (ver [DESARROLLO.md](DESARROLLO.md#3-publicar-una-versión)), no hace falta el código: en `docker-compose.yml` borra `build: .` e `image: mercastats:local` y pon `image: ghcr.io/neoruben/mercastats:latest`. Como el repositorio es privado, la imagen también lo es: antes inicia sesión con `docker login ghcr.io` (usuario de GitHub y un token con permiso `read:packages`).
+Para compilar la imagen a partir del código en lugar de descargarla, clona el repositorio y usa `build: .` (ver el README).
 
 ---
 
