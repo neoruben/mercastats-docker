@@ -13,44 +13,23 @@ Esta guía explica cómo desplegar la versión web self-hosted de **MercaStats**
 
 ---
 
-## 2. Instalación rápida con Docker Compose
+## 2. Instalación con Docker Compose
 
-1. Crea una carpeta para la instancia y descarga `docker-compose.example.yml` y `.env.example` (o clona el repositorio):
+Los pasos detallados (descargar el código, `docker-compose.yml`, `.env`, permisos de `data/`, arrancar, Dockge/Portainer y problemas frecuentes) están en el [README](../README.md#instalación-con-docker-compose-paso-a-paso).
 
-   ```bash
-   mkdir -p mercastats/data/inbox
-   cd mercastats
-   cp docker-compose.example.yml docker-compose.yml
-   cp .env.example .env
-   ```
-
-2. Ajusta los permisos de `./data` para el usuario no-root del contenedor (UID/GID `10001`):
-
-   ```bash
-   sudo chown -R 10001:10001 ./data
-   ```
-
-   Si prefieres que la carpeta siga siendo tuya (para copiar PDFs a `data/inbox` sin `sudo`), no cambies los permisos y añade en `docker-compose.yml` la línea `user: "1000:1000"` (tu UID y GID; los ves con el comando `id`).
-
-3. Edita `.env` y establece al menos `ADMIN_PASSWORD` (y opcionalmente los datos de IMAP o proxy).
-
-4. Arranca el contenedor:
-
-   ```bash
-   docker compose up -d
-   ```
-
-5. Abre `http://localhost:8080` e inicia sesión con `ADMIN_USER` y `ADMIN_PASSWORD`.
-
-### Compilar la imagen localmente
-
-Si prefieres construir la imagen desde el código fuente en lugar de descargarla de `ghcr.io`:
+En resumen:
 
 ```bash
-docker build -t mercastats:local .
+git clone https://github.com/neoruben/mercastats-docker.git && cd mercastats-docker
+cp docker-compose.example.yml docker-compose.yml
+cp .env.example .env            # pon al menos ADMIN_PASSWORD
+mkdir -p data/inbox && sudo chown -R 10001:10001 data
+docker compose up -d --build
 ```
 
-O descomenta `build: .` en `docker-compose.yml` y ejecuta `docker compose up -d --build`.
+### Usar la imagen publicada
+
+Si se ha publicado una versión (ver [DESARROLLO.md](DESARROLLO.md#3-publicar-una-versión)), no hace falta el código: en `docker-compose.yml` borra `build: .` e `image: mercastats:local` y pon `image: ghcr.io/neoruben/mercastats:latest`. Como el repositorio es privado, la imagen también lo es: antes inicia sesión con `docker login ghcr.io` (usuario de GitHub y un token con permiso `read:packages`).
 
 ---
 

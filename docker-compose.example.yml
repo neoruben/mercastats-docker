@@ -1,24 +1,29 @@
 services:
   mercastats:
-    # Imagen precompilada en GitHub Container Registry (cambia el tag a una versión fija si lo prefieres)
-    image: ghcr.io/neoruben/mercastats:latest
-    # Para compilar localmente en lugar de descargar la imagen, descomenta la línea siguiente:
-    # build: .
+    # Compila la imagen a partir del código de esta carpeta (la primera vez tarda unos minutos).
+    build: .
+    image: mercastats:local
+    # Si usas la imagen publicada en GitHub, borra las dos líneas anteriores y descomenta esta:
+    # image: ghcr.io/neoruben/mercastats:latest
     container_name: mercastats
     restart: unless-stopped
+    # Opcional: ejecutar con tu usuario para que la carpeta data/ siga siendo tuya
+    # (mira tu UID y GID con el comando `id`). Si no lo usas, haz `sudo chown -R 10001:10001 data`.
+    # user: "1000:1000"
     ports:
-      # Solo accesible desde la propia máquina. Para abrirlo a tu red local cambia a "8080:8080"
-      # (solo con AUTH_MODE=local). Detrás de un reverse proxy, quita 'ports' y usa una red Docker interna.
-      - "127.0.0.1:8080:8080"
+      # Puerto del equipo : puerto del contenedor. Cambia el primero si el 8080 ya está ocupado.
+      # Para que solo se pueda abrir desde el propio equipo, usa "127.0.0.1:8080:8080".
+      # Detrás de un proxy inverso, quita 'ports' y usa una red Docker interna.
+      - "8080:8080"
     env_file:
       - .env
-    # Opcional: limitar la memoria (recomendado en Raspberry Pi)
-    # environment:
-    #   - JAVA_OPTS=-Xmx256m -XX:+UseSerialGC
+    environment:
+      - TZ=Europe/Madrid
+      # Opcional: limitar la memoria de Java (recomendado en Raspberry Pi)
+      # - JAVA_OPTS=-Xmx256m -XX:+UseSerialGC
     # mem_limit: 512m
     volumes:
-      # Guarda la base de datos SQLite (/data/mercastats.db) y la carpeta vigilada (/data/inbox).
-      # Nota en Linux: el contenedor corre como UID/GID 10001 -> `mkdir -p ./data/inbox && chown -R 10001:10001 ./data`
+      # Base de datos (data/mercastats.db) y carpeta vigilada (data/inbox)
       - ./data:/data
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/health"]
