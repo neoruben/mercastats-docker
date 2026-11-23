@@ -30,7 +30,7 @@ services:
       - "8080:8080"
     environment:
       - TZ=Europe/Madrid
-      # Contraseña del usuario admin. Si no la pones, se genera una (ver más abajo).
+      # Contraseña del usuario admin: ponla ANTES del primer arranque (ver más abajo).
       # - ADMIN_PASSWORD=una-contraseña-larga
 
       # Leer los tickets del correo (opcional, ver «Importar tickets del correo»)
@@ -50,13 +50,25 @@ docker compose up -d
 
 La carpeta `data` se crea sola junto al compose. Ahí se guarda la base de datos, y dentro está `data/inbox`, la carpeta vigilada de la que se importan los PDFs.
 
-Abre `http://IP-del-equipo:8080` y entra con el usuario **`admin`**. Si no pusiste `ADMIN_PASSWORD`, la contraseña generada aparece en los logs del primer arranque:
+Abre `http://IP-del-equipo:8080` y entra con el usuario **`admin`**.
 
-```bash
-docker compose logs mercastats | grep Contraseña
-```
+### La contraseña de `admin`
 
-Después puedes cambiarla desde la web, en **Cambiar contraseña**.
+El usuario `admin` se crea **una sola vez, en el primer arranque**, y su contraseña se decide en ese momento:
+
+- **Si pusiste `ADMIN_PASSWORD`** antes de arrancar por primera vez, es esa.
+- **Si no la pusiste**, MercaStats genera una al azar y la escribe en los logs. Para verla:
+
+  ```bash
+  docker compose logs mercastats | grep Contraseña
+  ```
+
+A partir de ahí, la contraseña de `admin` se cambia **desde la web**, en **Cambiar contraseña**. Poner o cambiar `ADMIN_PASSWORD` después del primer arranque **no tiene ningún efecto**: el usuario ya existe y su contraseña está guardada en la base de datos.
+
+Si arrancaste sin `ADMIN_PASSWORD` y prefieres usar la tuya, tienes dos opciones:
+
+1. Entra con la contraseña generada y cámbiala desde la web.
+2. Si acabas de instalar y aún no tienes datos: para el contenedor (`docker compose down`), borra la carpeta `data`, pon `ADMIN_PASSWORD` y vuelve a arrancar (`docker compose up -d`).
 
 ### Opciones útiles
 
@@ -70,13 +82,22 @@ Se añaden en `environment:`, salvo el puerto.
 | `IMAP_SYNC_INTERVAL_MINUTES=60` | Cada cuánto se mira el correo (`0` = solo al pulsar Sincronizar) |
 | `ALLOW_REGISTRATION=true` | Que otras personas puedan crearse una cuenta desde la pantalla de inicio |
 
-La lista completa de opciones está en [docs/DOCKER.md](docs/DOCKER.md#5-variables-de-entorno). Si prefieres no poner las contraseñas en el compose, puedes ponerlas en un archivo `.env` y añadir `env_file: .env` (hay una plantilla en [`.env.example`](.env.example)).
+La lista completa de opciones está en [docs/DOCKER.md](docs/DOCKER.md#5-variables-de-entorno).
+
+**¿Y el archivo `.env`?** No hace falta: con este compose toda la configuración va en `environment:`. Si prefieres no tener las contraseñas en el compose, ponlas en un archivo `.env` junto a él (una por línea, sin el guion: `IMAP_PASSWORD=...`) y añade al compose, a la altura de `environment:`:
+
+```yaml
+    env_file:
+      - .env
+```
+
+Sin esa línea, lo que haya en el `.env` no llega a MercaStats. Hay una plantilla con todas las opciones en [`.env.example`](.env.example).
 
 ---
 
 ## Importar tickets
 
-- **Desde el correo:** rellena las líneas `IMAP_...` del compose y reinicia el contenedor con `docker compose up -d`. La primera sincronización empieza sola y los tickets van apareciendo en la web; con unos 200 tickets tarda unos minutos. Después se repite cada hora, y también al pulsar **Sincronizar**.
+- **Desde el correo:** rellena las líneas `IMAP_...` del compose y reinicia el contenedor con `docker compose up -d`. La primera sincronización empieza sola unos segundos después de arrancar, aunque no hayas entrado en la web, y los tickets van apareciendo; con unos 200 tickets tarda unos minutos. Después se repite cada hora, y también al pulsar **Sincronizar**.
   - `IMAP_PASSWORD` es una **contraseña de aplicación**, no la de tu cuenta. Cómo crearla en Gmail o iCloud: [docs/DOCKER.md](docs/DOCKER.md#6-cómo-crear-una-contraseña-de-aplicación-imap).
   - `IMAP_FOLDER` es la carpeta o etiqueta de Gmail donde guardas los tickets. Si está dentro de otra, se escribe con `/`. En Gmail, la etiqueta tiene que tener activado «Mostrar en IMAP». Para buscar en todo el correo usa `[Gmail]/Todos`, o `[Gmail]/All Mail` si tienes Gmail en inglés.
 - **Desde la web:** pulsa **Importar** y arrastra los PDFs, o elígelos desde el móvil. Se cargan solos.
@@ -100,8 +121,9 @@ docker compose up -d
 | Síntoma | Solución |
 |---|---|
 | `port is already allocated` | Ese puerto ya lo usa otro programa: cambia el primer número de `ports` |
-| No sé la contraseña de `admin` | Si no pusiste `ADMIN_PASSWORD`, búscala en los logs (ver «Instalación») |
-| He cambiado `ADMIN_PASSWORD` y no entra con la nueva | `ADMIN_PASSWORD` solo se usa la primera vez; después la contraseña se cambia desde la web |
+| No sé la contraseña de `admin` | Si no pusiste `ADMIN_PASSWORD` en el primer arranque, está en los logs. Ver «La contraseña de `admin`» |
+| He puesto o cambiado `ADMIN_PASSWORD` y no entra con ella | Solo cuenta en el primer arranque. Ver «La contraseña de `admin`» |
+| He puesto opciones en el `.env` y no hacen nada | Falta `env_file: .env` en el compose. Ver «¿Y el archivo `.env`?» |
 | No importa nada del correo | Revisa `IMAP_FOLDER` y que la etiqueta tenga activado «Mostrar en IMAP», y mira `docker compose logs mercastats` |
 | No puedo copiar PDFs en `data/inbox` | Pon en `PUID` y `PGID` tu usuario y grupo (comando `id`) y reinicia |
 | Se cierra solo en la Raspberry Pi | Añade `JAVA_OPTS=-Xmx256m -XX:+UseSerialGC` |

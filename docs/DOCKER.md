@@ -74,7 +74,7 @@ El botón **Sincronizar** del panel **Importar** (y el botón ⟳ junto a él) l
 | --- | --- | --- |
 | `AUTH_MODE` | `local` | Modo de autenticación: `local`, `proxy` o `none`. |
 | `ADMIN_USER` | `admin` | Nombre del usuario administrador inicial (y usuario por defecto en `AUTH_MODE=none`). |
-| `ADMIN_PASSWORD` | *(vacío)* | Contraseña inicial del administrador en `AUTH_MODE=local`. Si se omite al crear la BD, se genera una contraseña aleatoria y se muestra en los logs. |
+| `ADMIN_PASSWORD` | *(vacío)* | Contraseña del administrador en `AUTH_MODE=local`. **Solo se usa en el primer arranque**, al crear el usuario; si no está puesta entonces, se genera una al azar y se muestra en los logs. Después se cambia desde la web: cambiar esta variable ya no tiene efecto. |
 | `ALLOW_REGISTRATION` | `false` | Permite crear cuentas nuevas desde la pantalla de login en modo `local`. Los administradores también pueden crear usuarios desde el modal de cuenta. |
 | `COOKIE_SECURE` | `false` | Marca la cookie de sesión con el atributo `Secure`. Ponlo a `true` si sirves MercaStats por HTTPS. |
 | `SESSION_TTL_DAYS` | `30` | Duración en días de las sesiones locales (almacenadas en SQLite). |
@@ -150,7 +150,7 @@ Usar una **contraseña de aplicación** es la forma más sencilla y segura de co
 1. Asegúrate de tener activa la **autenticación de doble factor** en tu cuenta de Apple.
 2. Inicia sesión en [account.apple.com](https://account.apple.com/).
 3. En la sección **Inicio de sesión y seguridad**, selecciona **Contraseñas específicas de la aplicación** y genera una nueva para `MercaStats`.
-4. Usa tu dirección de Apple/iCloud y la contraseña generada (`xxxx-xxxx-xxxx-xxxx`) en `.env`:
+4. Usa tu dirección de Apple/iCloud y la contraseña generada (`xxxx-xxxx-xxxx-xxxx`) en la configuración:
 
    ```env
    IMAP_HOST=imap.mail.me.com

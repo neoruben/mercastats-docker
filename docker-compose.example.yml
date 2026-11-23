@@ -9,7 +9,8 @@ services:
       - "8080:8080"
     environment:
       - TZ=Europe/Madrid
-      # Contraseña del usuario admin. Si no la pones, se genera una y aparece en los logs.
+      # Contraseña del usuario admin. Solo cuenta si está puesta en el PRIMER arranque;
+      # si no, se genera una y aparece en los logs. Después se cambia desde la web.
       # - ADMIN_PASSWORD=una-contraseña-larga
 
       # Leer los tickets del correo (contraseña de aplicación, no la de tu cuenta)
