@@ -1,4 +1,10 @@
-# MercaStats (Docker)
+<h1 align="center">MercaStats (Docker)</h1>
+
+<p align="center">
+  <a href="https://ko-fi.com/neoruben" target="_blank">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="38">
+  </a>
+</p>
 
 Estadísticas de tus tickets de Mercadona en PDF, en tu propio servidor y desde el navegador del ordenador o del móvil.
 
@@ -151,6 +157,10 @@ docker compose up -d
 
 - [docs/DOCKER.md](docs/DOCKER.md): todas las opciones, correo (Gmail e iCloud), uso detrás de authentik y API.
 - [docs/DESARROLLO.md](docs/DESARROLLO.md): para quien quiera modificar el código.
+
+## Apoya el proyecto
+
+Si te gusta el proyecto o te resulta de utilidad, puedes apoyar su desarrollo invitándome a un café en [Ko-fi](https://ko-fi.com/neoruben).
 
 ## Licencia
 
