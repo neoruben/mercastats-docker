@@ -48,11 +48,15 @@ DATA_DIR=./data ADMIN_PASSWORD=una-contraseña ./gradlew :server:run
 
 Y abre `http://localhost:8080`.
 
-Para construir la imagen:
+Para construir la imagen y probarla:
 
 ```bash
 docker build -t mercastats:local .
 ```
+
+En `docker-compose.yml`, cambia `image: ghcr.io/neoruben/mercastats:latest` por `build: .` para compilarla con `docker compose up -d --build`.
+
+La imagen arranca con `docker-entrypoint.sh`: como root solo crea `/data` y `/data/inbox`, les da como dueño `PUID:PGID` y pasa a ese usuario con `su-exec` antes de lanzar el servidor.
 
 ---
 

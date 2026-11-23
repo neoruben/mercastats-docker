@@ -1,32 +1,29 @@
+# Ejemplo de docker-compose.yml para MercaStats. Explicación en el README.
 services:
   mercastats:
-    # Imagen publicada en GitHub (mientras sea privada, antes haz `docker login ghcr.io`).
     image: ghcr.io/neoruben/mercastats:latest
-    # Para compilarla tú a partir del código de esta carpeta, cambia la línea anterior por:
-    # build: .
     container_name: mercastats
     restart: unless-stopped
-    # Opcional: ejecutar con tu usuario para que la carpeta data/ siga siendo tuya
-    # (mira tu UID y GID con el comando `id`). Si no lo usas, haz `sudo chown -R 10001:10001 data`.
-    # user: "1000:1000"
     ports:
-      # Puerto del equipo : puerto del contenedor. Cambia el primero si el 8080 ya está ocupado.
-      # Para que solo se pueda abrir desde el propio equipo, usa "127.0.0.1:8080:8080".
-      # Detrás de un proxy inverso, quita 'ports' y usa una red Docker interna.
+      # Puerto del equipo : puerto del contenedor. Cambia el primero si el 8080 está ocupado.
       - "8080:8080"
-    env_file:
-      - .env
     environment:
       - TZ=Europe/Madrid
-      # Opcional: limitar la memoria de Java (recomendado en Raspberry Pi)
+      # Contraseña del usuario admin. Si no la pones, se genera una y aparece en los logs.
+      # - ADMIN_PASSWORD=una-contraseña-larga
+
+      # Leer los tickets del correo (contraseña de aplicación, no la de tu cuenta)
+      # - IMAP_HOST=imap.gmail.com
+      # - IMAP_USER=tu_correo@gmail.com
+      # - IMAP_PASSWORD=xxxx xxxx xxxx xxxx
+      # - IMAP_FOLDER=Tickets/Mercadona
+
+      # Usuario y grupo dueños de la carpeta data (por defecto 1000)
+      # - PUID=1000
+      # - PGID=1000
+
+      # Menos memoria (recomendado en Raspberry Pi)
       # - JAVA_OPTS=-Xmx256m -XX:+UseSerialGC
-    # mem_limit: 512m
     volumes:
-      # Base de datos (data/mercastats.db) y carpeta vigilada (data/inbox)
+      # Base de datos y carpeta vigilada (data/inbox). Se crea sola.
       - ./data:/data
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s

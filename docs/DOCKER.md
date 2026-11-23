@@ -15,19 +15,11 @@ Esta guía explica cómo desplegar la versión web self-hosted de **MercaStats**
 
 ## 2. Instalación con Docker Compose
 
-Los pasos detallados (inicio de sesión en GitHub, `docker-compose.yml`, `.env`, permisos de `data/`, arrancar, Dockge/Portainer y problemas frecuentes) están en el [README](../README.md#instalación-con-docker-compose-paso-a-paso).
+Los pasos están en el [README](../README.md#instalación): un `docker-compose.yml` con la imagen `ghcr.io/neoruben/mercastats:latest` y `docker compose up -d`.
 
-En resumen, en una carpeta nueva:
+La carpeta de datos (`./data` y `./data/inbox`) se crea sola en el primer arranque. El contenedor arranca como root solo para crearla y darle como dueño `PUID:PGID` (por defecto `1000:1000`); después el servidor funciona con ese usuario, nunca como root. Si prefieres que no arranque nunca como root, añade `user: "1000:1000"` al compose y crea tú la carpeta `data` con ese usuario.
 
-```bash
-docker login ghcr.io -u TU_USUARIO_DE_GITHUB   # mientras la imagen sea privada
-mkdir -p data/inbox
-nano docker-compose.yml                       # con image: ghcr.io/neoruben/mercastats:latest
-nano .env                                     # al menos ADMIN_PASSWORD
-docker compose up -d
-```
-
-Para compilar la imagen a partir del código en lugar de descargarla, clona el repositorio y usa `build: .` (ver el README).
+Las variables de entorno se pueden poner en `environment:` del compose o en un archivo `.env` con `env_file: .env` (plantilla en [`.env.example`](../.env.example)).
 
 ---
 
@@ -74,6 +66,7 @@ El botón **Sincronizar** del panel **Importar** (y el botón ⟳ junto a él) l
 | `INBOX_DIR` | `/data/inbox` | Carpeta vigilada para importación automática de PDFs. |
 | `INBOX_POLL_SECONDS` | `30` | Frecuencia de escaneo de `INBOX_DIR` en segundos (`0` desactiva la vigilancia). |
 | `INBOX_DEFAULT_USER` | `ADMIN_USER` (`admin`) | Usuario que recibe los PDFs colocados en la raíz de `INBOX_DIR`. |
+| `PUID` / `PGID` | `1000` / `1000` | Usuario y grupo con los que funciona el servidor y dueños de la carpeta de datos. |
 
 ### Autenticación (`AUTH_MODE`)
 
@@ -313,16 +306,8 @@ sqlite3 ./data/mercastats.db ".backup './mercastats-backup.db'"
 
 ## 10. Actualizar
 
-Si usas la imagen publicada:
-
 ```bash
 docker compose pull && docker compose up -d
-```
-
-Si compilas desde el código (`build: .` en `docker-compose.yml`):
-
-```bash
-git pull && docker compose up -d --build
 ```
 
 La base de datos se conserva en `./data`.
