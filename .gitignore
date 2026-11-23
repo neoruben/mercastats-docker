@@ -1,0 +1,16 @@
+# Gradle / build
+.gradle/
+build/
+*.class
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Datos locales y secretos (solo en la raíz)
+/data/
+.env
+
+# Tickets personales
+*.pdf

@@ -1,0 +1,28 @@
+services:
+  mercastats:
+    # Imagen precompilada en GitHub Container Registry (cambia el tag a una versión fija si lo prefieres)
+    image: ghcr.io/neoruben/mercastats:latest
+    # Para compilar localmente en lugar de descargar la imagen, descomenta la línea siguiente:
+    # build: .
+    container_name: mercastats
+    restart: unless-stopped
+    ports:
+      # Solo accesible desde la propia máquina. Para abrirlo a tu red local cambia a "8080:8080"
+      # (solo con AUTH_MODE=local). Detrás de un reverse proxy, quita 'ports' y usa una red Docker interna.
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - .env
+    # Opcional: limitar la memoria (recomendado en Raspberry Pi)
+    # environment:
+    #   - JAVA_OPTS=-Xmx256m -XX:+UseSerialGC
+    # mem_limit: 512m
+    volumes:
+      # Guarda la base de datos SQLite (/data/mercastats.db) y la carpeta vigilada (/data/inbox).
+      # Nota en Linux: el contenedor corre como UID/GID 10001 -> `mkdir -p ./data/inbox && chown -R 10001:10001 ./data`
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
