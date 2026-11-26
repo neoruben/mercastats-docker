@@ -1,0 +1,244 @@
+{{- $fullname := include "mercastats.fullname" . }}
+{{- $secretName := include "mercastats.secretName" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  {{- include "mercastats.metadata" (dict "context" $ "component" "server" "labels" .Values.deploymentLabels "annotations" .Values.deploymentAnnotations) | nindent 2 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  strategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "mercastats.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if not .Values.existingSecret }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "mercastats.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+        {{- with .Values.podLabels }}
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with (include "mercastats.imagePullSecrets" . | trim) }}
+      {{- . | nindent 6 }}
+      {{- end }}
+      serviceAccountName: {{ include "mercastats.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      enableServiceLinks: {{ .Values.enableServiceLinks }}
+      {{- with (include "mercastats.securityContext" (dict "secContext" .Values.podSecurityContext "context" $)) }}
+      securityContext:
+        {{- . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.schedulerName }}
+      schedulerName: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.runtimeClassName }}
+      runtimeClassName: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.hostAliases }}
+      hostAliases:
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dnsPolicy }}
+      dnsPolicy: {{ . }}
+      {{- end }}
+      {{- with .Values.dnsConfig }}
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.volumePermissions.enabled .Values.initContainers }}
+      initContainers:
+        {{- if .Values.volumePermissions.enabled }}
+        {{- $psc := .Values.podSecurityContext | default dict }}
+        {{- $uid := $psc.runAsUser | default 1000 | int }}
+        {{- $gid := $psc.fsGroup | default $psc.runAsGroup | default 1000 | int }}
+        - name: volume-permissions
+          image: {{ include "mercastats.auxImage" (dict "image" .Values.volumePermissions.image "context" $) }}
+          imagePullPolicy: {{ include "mercastats.auxPullPolicy" (dict "image" .Values.volumePermissions.image "context" $) }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mkdir -p /data/inbox
+              find /data -xdev \( ! -user {{ $uid }} -o ! -group {{ $gid }} \) -exec chown -h {{ $uid }}:{{ $gid }} {} +
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN
+                - DAC_OVERRIDE
+                - FOWNER
+          {{- with .Values.volumePermissions.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              {{- with .Values.persistence.data.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            {{- if .Values.persistence.inbox.enabled }}
+            - name: inbox
+              mountPath: /data/inbox
+              {{- with .Values.persistence.inbox.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            {{- end }}
+        {{- end }}
+        {{- with .Values.initContainers }}
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: mercastats
+          image: {{ include "mercastats.mainImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.command }}
+          command:
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          {{- with (include "mercastats.securityContext" (dict "secContext" .Values.securityContext "context" $)) }}
+          securityContext:
+            {{- . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}
+            {{- with .Values.extraEnvFrom }}
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
+          env:
+            # Directorio personal escribible (cachés de la JVM y PDFBox) con readOnlyRootFilesystem.
+            - name: HOME
+              value: /tmp
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ .Values.secretKeys.adminPassword }}
+                  optional: true
+            {{- if .Values.config.imap.enabled }}
+            - name: IMAP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ .Values.secretKeys.imapPassword }}
+                  optional: true
+            {{- end }}
+            {{- if .Values.config.gmail.enabled }}
+            - name: GMAIL_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ .Values.secretKeys.gmailClientSecret }}
+                  optional: true
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            {{- include "mercastats.probe" (dict "probe" .Values.startupProbe "custom" .Values.customStartupProbe "context" $) | trim | nindent 12 }}
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            {{- include "mercastats.probe" (dict "probe" .Values.livenessProbe "custom" .Values.customLivenessProbe "context" $) | trim | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            {{- include "mercastats.probe" (dict "probe" .Values.readinessProbe "custom" .Values.customReadinessProbe "context" $) | trim | nindent 12 }}
+          {{- end }}
+          {{- with .Values.lifecycle }}
+          lifecycle:
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              {{- with .Values.persistence.data.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            {{- if .Values.persistence.inbox.enabled }}
+            - name: inbox
+              mountPath: /data/inbox
+              {{- with .Values.persistence.inbox.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
+        {{- with .Values.sidecars }}
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.data.enabled }}
+          {{- include "mercastats.volumeSource" (dict "persistence" .Values.persistence.data "suffix" "data" "context" $) | trim | nindent 10 }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.persistence.inbox.enabled }}
+        - name: inbox
+          {{- include "mercastats.volumeSource" (dict "persistence" .Values.persistence.inbox "suffix" "inbox" "context" $) | trim | nindent 10 }}
+        {{- end }}
+        - name: tmp
+          {{- $tmp := dict }}
+          {{- with .Values.tmpVolume.medium }}{{ $_ := set $tmp "medium" . }}{{ end }}
+          {{- with .Values.tmpVolume.sizeLimit }}{{ $_ := set $tmp "sizeLimit" . }}{{ end }}
+          emptyDir: {{- if $tmp }}{{ toYaml $tmp | nindent 12 }}{{ else }} {}{{ end }}
+        {{- with .Values.extraVolumes }}
+        {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}

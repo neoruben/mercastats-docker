@@ -1,0 +1,27 @@
+{{- if .Values.httpRoute.enabled }}
+{{- $fullname := include "mercastats.fullname" . }}
+{{- $port := .Values.service.port }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  {{- include "mercastats.metadata" (dict "context" $ "component" "server" "labels" .Values.httpRoute.labels "annotations" .Values.httpRoute.annotations) | nindent 2 }}
+spec:
+  {{- with .Values.httpRoute.parentRefs }}
+  parentRefs:
+    {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{- end }}
+  {{- with .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- range . }}
+    - {{ tpl (toString .) $ | quote }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.httpRoute.rules }}
+    {{- $rule := deepCopy . }}
+    {{- if not (hasKey $rule "backendRefs") }}
+    {{- $_ := set $rule "backendRefs" (list (dict "name" $fullname "port" (int $port))) }}
+    {{- end }}
+    - {{- include "mercastats.tplvalues.render" (dict "value" $rule "context" $) | nindent 6 }}
+    {{- end }}
+{{- end }}

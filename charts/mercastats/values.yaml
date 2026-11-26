@@ -1,0 +1,571 @@
+# ==============================================================================
+# Valores por defecto del chart de MercaStats.
+# Copia solo lo que quieras cambiar a tu propio archivo (p. ej. my-values.yaml)
+# e instala con:  helm install mercastats ./charts/mercastats -f my-values.yaml
+# ==============================================================================
+
+## @section Parámetros globales
+global:
+  # -- Registro que sustituye al de todas las imágenes del chart (mirrors, air-gapped).
+  imageRegistry: ""
+  # -- Secretos de descarga de imágenes añadidos a todos los pods.
+  # Admite nombres (`- my-secret`) u objetos (`- name: my-secret`).
+  imagePullSecrets: []
+  compatibility:
+    openshift:
+      # -- Adapta los securityContext a OpenShift (quita runAsUser, runAsGroup y
+      # fsGroup para que la SCC asigne el UID). `auto` lo detecta por la API
+      # `security.openshift.io`; `force` siempre; `disabled` nunca.
+      adaptSecurityContext: auto
+
+## @section Parámetros comunes
+# -- Sustituye el nombre del chart en los recursos.
+nameOverride: ""
+# -- Sustituye el nombre completo de los recursos.
+fullnameOverride: ""
+# -- Despliega en este namespace en lugar del de la release.
+namespaceOverride: ""
+# -- Etiquetas añadidas a todos los recursos.
+commonLabels: {}
+# -- Anotaciones añadidas a todos los recursos.
+commonAnnotations: {}
+
+## @section Imagen
+image:
+  # -- Registro de la imagen.
+  registry: ghcr.io
+  # -- Repositorio de la imagen.
+  repository: neoruben/mercastats
+  # -- Etiqueta de la imagen. Vacío = `appVersion` del Chart.yaml.
+  tag: ""
+  # -- Digest de la imagen (`sha256:...`). Si se pone, tiene prioridad sobre la etiqueta.
+  digest: ""
+  # -- Política de descarga de la imagen.
+  pullPolicy: IfNotPresent
+# -- Secretos de descarga de imágenes (además de `global.imagePullSecrets`).
+imagePullSecrets: []
+
+## @section Configuración de MercaStats
+# Cada opción se traduce a la variable de entorno equivalente de la imagen
+# (ver docs/DOCKER.md). Las opciones vacías usan el valor por defecto de la aplicación.
+config:
+  # -- Zona horaria (`TZ`).
+  timezone: Europe/Madrid
+  # -- Nivel de logs (`LOG_LEVEL`): DEBUG, INFO, WARN, ERROR.
+  logLevel: INFO
+  # -- Interfaz de escucha (`HOST`). Usa `"::"` en clústeres solo IPv6.
+  host: 0.0.0.0
+  # -- URL pública (`BASE_URL`). Vacío = se deduce del primer host del Ingress
+  # (https si tiene TLS). Se usa para la redirección de Gmail OAuth y para
+  # `config.auth.cookieSecure: auto`.
+  baseUrl: ""
+  # -- Opciones de la JVM (`JAVA_OPTS`). Por defecto la memoria se ajusta al
+  # límite del contenedor (`resources.limits.memory`).
+  javaOpts: "-XX:MaxRAMPercentage=60.0 -XX:+UseSerialGC -Djava.io.tmpdir=/tmp"
+
+  inbox:
+    # -- Segundos entre escaneos de la carpeta vigilada (`INBOX_POLL_SECONDS`, 0 = desactivada).
+    pollSeconds: 30
+    # -- Usuario que recibe los PDFs de la raíz de la carpeta (`INBOX_DEFAULT_USER`).
+    # Vacío = `config.auth.adminUser`.
+    defaultUser: ""
+
+  auth:
+    # -- Modo de autenticación (`AUTH_MODE`): `local`, `proxy` o `none`.
+    mode: local
+    # -- Usuario administrador (`ADMIN_USER`).
+    adminUser: admin
+    # -- Contraseña inicial del administrador (`ADMIN_PASSWORD`). Solo cuenta en el
+    # PRIMER arranque; vacía = se genera una y aparece en los logs. Se guarda en un
+    # Secret. Mejor usa `existingSecret` en producción.
+    adminPassword: ""
+    # -- Permite el registro público desde el login (`ALLOW_REGISTRATION`).
+    allowRegistration: false
+    # -- Cookie de sesión con atributo Secure (`COOKIE_SECURE`): `true`, `false` o
+    # `auto` (true si la URL pública empieza por https://).
+    cookieSecure: auto
+    # -- Duración de las sesiones en días (`SESSION_TTL_DAYS`).
+    sessionTtlDays: 30
+    proxy:
+      # -- Cabecera con el usuario (`PROXY_USER_HEADER`). Tu proxy debe sobrescribirla siempre.
+      userHeader: X-authentik-username
+      # -- Cabecera con el correo (`PROXY_EMAIL_HEADER`).
+      emailHeader: X-authentik-email
+      # -- Cabecera con el nombre visible (`PROXY_NAME_HEADER`).
+      nameHeader: X-authentik-name
+      # -- IPs o rangos CIDR desde los que se aceptan las cabeceras (`TRUSTED_PROXIES`).
+      # Obligatorio con `mode: proxy`. En Kubernetes es la IP de los pods del
+      # ingress controller / outpost (o su rango), NO la del Service.
+      trustedProxies: []
+      # - 10.42.0.0/16
+
+  imap:
+    # -- Activa la sincronización por IMAP con contraseña de aplicación.
+    enabled: false
+    # -- Servidor IMAP (`IMAP_HOST`).
+    host: ""
+    # -- Puerto IMAP (`IMAP_PORT`). Vacío = 993 con SSL, 143 sin SSL.
+    port: ""
+    # -- `true` = IMAPS (TLS directo); `false` = STARTTLS obligatorio (`IMAP_SSL`).
+    ssl: true
+    # -- Usuario / correo IMAP (`IMAP_USER`).
+    user: ""
+    # -- Contraseña de aplicación (`IMAP_PASSWORD`). Se guarda en un Secret.
+    password: ""
+    # -- Carpeta o etiqueta de Gmail (`IMAP_FOLDER`).
+    folder: INBOX
+    # -- Remitente buscado (`IMAP_FROM_FILTER`).
+    fromFilter: ticket_digital@mail.mercadona.com
+    # -- Minutos entre sincronizaciones (`IMAP_SYNC_INTERVAL_MINUTES`, 0 = solo manual).
+    syncIntervalMinutes: 60
+    # -- Usuario que recibe los tickets (`IMAP_TARGET_USER`). Vacío = `config.auth.adminUser`.
+    targetUser: ""
+
+  gmail:
+    # -- Activa la sincronización por Gmail OAuth 2.0.
+    enabled: false
+    # -- Client ID OAuth (`GMAIL_CLIENT_ID`).
+    clientId: ""
+    # -- Client Secret OAuth (`GMAIL_CLIENT_SECRET`). Se guarda en un Secret.
+    clientSecret: ""
+    # -- URI de redirección (`GMAIL_REDIRECT_URI`). Vacío = `<baseUrl>/api/gmail/oauth/callback`.
+    redirectUri: ""
+    # -- Minutos entre sincronizaciones (`GMAIL_SYNC_INTERVAL_MINUTES`, 0 = solo manual).
+    syncIntervalMinutes: 60
+
+# -- Secret ya existente con los valores sensibles. Si se indica, el chart no
+# crea el suyo y `adminPassword`, `imap.password` y `gmail.clientSecret` se ignoran.
+existingSecret: ""
+# Nombre de cada clave dentro del Secret (propio o existente). Las claves que
+# falten en el Secret simplemente no se definen.
+secretKeys:
+  # -- Clave con la contraseña inicial del administrador.
+  adminPassword: ADMIN_PASSWORD
+  # -- Clave con la contraseña IMAP.
+  imapPassword: IMAP_PASSWORD
+  # -- Clave con el Client Secret de Gmail.
+  gmailClientSecret: GMAIL_CLIENT_SECRET
+
+# -- Variables de entorno adicionales (lista de EnvVar; admite plantillas).
+# Tienen prioridad sobre las generadas por el chart.
+extraEnv: []
+# - name: JAVA_TOOL_OPTIONS
+#   value: "-Dfile.encoding=UTF-8"
+# -- Fuentes adicionales de variables de entorno (ConfigMaps / Secrets).
+extraEnvFrom: []
+# - secretRef:
+#     name: mercastats-extra
+
+## @section Despliegue
+# -- Réplicas. MercaStats usa SQLite y solo admite 1 (0 para pararlo).
+replicaCount: 1
+# -- Estrategia del Deployment. `Recreate` evita dos pods con la misma base de datos.
+updateStrategy:
+  type: Recreate
+# -- Número de ReplicaSets antiguos que se conservan.
+revisionHistoryLimit: 3
+# -- Anotaciones del Deployment.
+deploymentAnnotations: {}
+# -- Etiquetas del Deployment.
+deploymentLabels: {}
+# -- Anotaciones de los pods.
+podAnnotations: {}
+# -- Etiquetas de los pods.
+podLabels: {}
+
+# -- Puerto HTTP del contenedor (`PORT`).
+containerPort: 8080
+
+# -- Sustituye el comando del contenedor.
+command: []
+# -- Sustituye los argumentos del contenedor.
+args: []
+
+# -- securityContext del pod. Con un UID distinto de 0 el entrypoint de la imagen
+# no cambia los dueños; los permisos de escritura sobre el volumen los da `fsGroup`.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+# -- securityContext del contenedor.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  capabilities:
+    drop:
+      - ALL
+
+# -- Recursos del contenedor. La JVM usa el 60 % del límite de memoria como heap.
+resources:
+  requests:
+    cpu: 50m
+    memory: 192Mi
+  limits:
+    memory: 512Mi
+
+# Sondas sobre `GET /api/health`.
+startupProbe:
+  # -- Activa la startupProbe (da margen al arranque de la JVM, p. ej. en Raspberry Pi).
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 36
+  successThreshold: 1
+livenessProbe:
+  # -- Activa la livenessProbe.
+  enabled: true
+  initialDelaySeconds: 0
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+readinessProbe:
+  # -- Activa la readinessProbe.
+  enabled: true
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+# -- Sustituye por completo la startupProbe.
+customStartupProbe: {}
+# -- Sustituye por completo la livenessProbe.
+customLivenessProbe: {}
+# -- Sustituye por completo la readinessProbe.
+customReadinessProbe: {}
+
+# -- Hooks de ciclo de vida del contenedor.
+lifecycle: {}
+# -- Segundos de gracia al parar el pod.
+terminationGracePeriodSeconds: 30
+
+# -- Selector de nodos.
+nodeSelector: {}
+# -- Tolerancias.
+tolerations: []
+# -- Afinidad (p. ej. fijar el pod a un nodo con almacenamiento local).
+affinity: {}
+# -- Restricciones de reparto entre zonas / nodos.
+topologySpreadConstraints: []
+# -- PriorityClass de los pods.
+priorityClassName: ""
+# -- Scheduler alternativo.
+schedulerName: ""
+# -- RuntimeClass (p. ej. gvisor, kata).
+runtimeClassName: ""
+# -- Entradas extra de /etc/hosts.
+hostAliases: []
+# -- Política DNS del pod.
+dnsPolicy: ""
+# -- Configuración DNS del pod.
+dnsConfig: {}
+# -- Inyecta variables de entorno de los Services del namespace (desactivado: no se usan).
+enableServiceLinks: false
+
+# -- Contenedores init adicionales (admite plantillas).
+initContainers: []
+# -- Contenedores sidecar adicionales (admite plantillas).
+sidecars: []
+# -- Volúmenes adicionales del pod (admite plantillas).
+extraVolumes: []
+# -- Montajes adicionales del contenedor principal (admite plantillas).
+extraVolumeMounts: []
+
+# Contenedor init que crea /data y /data/inbox y les da como dueño
+# `podSecurityContext.runAsUser:fsGroup`. Útil con hostPath, NFS u otros
+# volúmenes que no respetan `fsGroup`. Se ejecuta como root.
+volumePermissions:
+  # -- Activa el contenedor init de permisos.
+  enabled: false
+  # -- Imagen del contenedor init. Vacío = la propia imagen de MercaStats.
+  image:
+    registry: ""
+    repository: ""
+    tag: ""
+    digest: ""
+    pullPolicy: ""
+  # -- Recursos del contenedor init.
+  resources: {}
+
+## @section ServiceAccount
+serviceAccount:
+  # -- Crea un ServiceAccount propio.
+  create: true
+  # -- Nombre del ServiceAccount. Vacío = nombre completo de la release (o `default` si no se crea).
+  name: ""
+  # -- Anotaciones del ServiceAccount (p. ej. IRSA / Workload Identity).
+  annotations: {}
+  # -- Etiquetas del ServiceAccount.
+  labels: {}
+  # -- Monta el token en el ServiceAccount (MercaStats no usa la API de Kubernetes).
+  automount: false
+# -- Monta el token del ServiceAccount en el pod.
+automountServiceAccountToken: false
+
+## @section Persistencia
+persistence:
+  # Base de datos SQLite y carpeta vigilada (/data).
+  data:
+    # -- Persiste /data. Si es `false` se usa un emptyDir y los datos SE PIERDEN al reiniciar el pod.
+    enabled: true
+    # -- PVC ya existente.
+    existingClaim: ""
+    # -- Volumen propio en lugar de un PVC (p. ej. `hostPath: {path: /srv/mercastats}`
+    # o `nfs: {server: nas.lan, path: /mercastats}`).
+    volume: {}
+    # -- StorageClass. Vacío = la por defecto del clúster; `"-"` = sin StorageClass.
+    storageClass: ""
+    # -- Modos de acceso del PVC.
+    accessModes:
+      - ReadWriteOnce
+    # -- Tamaño del PVC.
+    size: 1Gi
+    # -- Selector de PV.
+    selector: {}
+    # -- Enlaza con un PV concreto.
+    volumeName: ""
+    # -- Crea el PVC a partir de un snapshot u otro PVC.
+    dataSource: {}
+    # -- Ruta dentro del volumen que se monta en /data.
+    subPath: ""
+    # -- Anotaciones del PVC.
+    annotations: {}
+    # -- Etiquetas del PVC.
+    labels: {}
+    # -- Conserva el PVC al desinstalar (`helm.sh/resource-policy: keep`).
+    retain: true
+
+  # Volumen independiente para la carpeta vigilada (/data/inbox), p. ej. una
+  # carpeta compartida por SMB/NFS en la que dejar PDFs.
+  inbox:
+    # -- Monta un volumen propio en /data/inbox.
+    enabled: false
+    # -- PVC ya existente.
+    existingClaim: ""
+    # -- Volumen propio en lugar de un PVC (p. ej. `nfs: {...}`).
+    volume: {}
+    # -- StorageClass. Vacío = la por defecto; `"-"` = sin StorageClass.
+    storageClass: ""
+    # -- Modos de acceso del PVC.
+    accessModes:
+      - ReadWriteOnce
+    # -- Tamaño del PVC.
+    size: 1Gi
+    selector: {}
+    volumeName: ""
+    dataSource: {}
+    subPath: ""
+    annotations: {}
+    labels: {}
+    retain: true
+
+# emptyDir montado en /tmp (necesario con readOnlyRootFilesystem).
+tmpVolume:
+  # -- Tamaño máximo de /tmp.
+  sizeLimit: 256Mi
+  # -- `Memory` para usar tmpfs.
+  medium: ""
+
+## @section Service
+service:
+  # -- Crea el Service.
+  enabled: true
+  # -- Tipo: ClusterIP, NodePort o LoadBalancer.
+  type: ClusterIP
+  # -- Puerto del Service.
+  port: 8080
+  # -- NodePort fijo (solo NodePort / LoadBalancer).
+  nodePort: ""
+  # -- Nombre del puerto.
+  portName: http
+  # -- appProtocol del puerto.
+  appProtocol: http
+  # -- clusterIP fijo (o `None`).
+  clusterIP: ""
+  # -- IP del LoadBalancer (si tu proveedor lo admite).
+  loadBalancerIP: ""
+  # -- Clase de LoadBalancer.
+  loadBalancerClass: ""
+  # -- Rangos de origen permitidos en el LoadBalancer.
+  loadBalancerSourceRanges: []
+  # -- `Local` conserva la IP de origen del cliente.
+  externalTrafficPolicy: ""
+  # -- Política de tráfico interno.
+  internalTrafficPolicy: ""
+  # -- SingleStack, PreferDualStack o RequireDualStack.
+  ipFamilyPolicy: ""
+  # -- Familias IP (IPv4, IPv6).
+  ipFamilies: []
+  # -- IPs externas.
+  externalIPs: []
+  # -- Afinidad de sesión.
+  sessionAffinity: ""
+  # -- Anotaciones (p. ej. MetalLB, nube).
+  annotations: {}
+  # -- Etiquetas.
+  labels: {}
+
+## @section Ingress
+ingress:
+  # -- Crea un Ingress.
+  enabled: false
+  # -- IngressClass (nginx, traefik, haproxy...). Vacío = la por defecto del clúster.
+  className: ""
+  # -- Anotaciones del Ingress (cert-manager, auth, tamaño máximo de subida...).
+  annotations: {}
+  # cert-manager.io/cluster-issuer: letsencrypt
+  # nginx.ingress.kubernetes.io/proxy-body-size: 50m
+  # -- Etiquetas del Ingress.
+  labels: {}
+  # -- Hosts y rutas. MercaStats se sirve en la raíz (`/`).
+  hosts:
+    - host: mercastats.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS del Ingress.
+  tls: []
+  # - secretName: mercastats-tls
+  #   hosts:
+  #     - mercastats.example.com
+
+## @section Gateway API
+httpRoute:
+  # -- Crea un HTTPRoute (Gateway API v1).
+  enabled: false
+  # -- Anotaciones.
+  annotations: {}
+  # -- Etiquetas.
+  labels: {}
+  # -- Gateways a los que se engancha la ruta.
+  parentRefs: []
+  # - name: gateway
+  #   namespace: gateway-system
+  #   sectionName: https
+  # -- Hostnames de la ruta.
+  hostnames: []
+  # - mercastats.example.com
+  # -- Reglas. El backend (este Service) se añade solo si no se indica `backendRefs`.
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+## @section NetworkPolicy
+networkPolicy:
+  # -- Crea una NetworkPolicy.
+  enabled: false
+  ingress:
+    # -- Orígenes permitidos hacia el puerto HTTP. Vacío = cualquiera.
+    # Con `auth.mode: proxy` conviene limitarlo al ingress controller / outpost.
+    from: []
+    # - namespaceSelector:
+    #     matchLabels:
+    #       kubernetes.io/metadata.name: ingress-nginx
+    # -- Reglas de entrada adicionales.
+    extraRules: []
+  egress:
+    # -- Restringe también la salida (DNS + puertos de `allowedPorts` + `extraRules`).
+    enabled: false
+    # -- Puertos de salida permitidos a cualquier destino (HTTPS para Gmail, IMAP).
+    allowedPorts:
+      - 443
+      - 993
+      - 143
+    # -- Reglas de salida adicionales.
+    extraRules: []
+
+## @section Copias de seguridad
+# CronJob que hace `sqlite3 .backup` de la base de datos (seguro con WAL) en un
+# volumen aparte y conserva las últimas `keep` copias.
+backup:
+  # -- Activa las copias de seguridad programadas.
+  enabled: false
+  # -- Programación cron.
+  schedule: "0 3 * * *"
+  # -- Zona horaria de la programación (Kubernetes 1.27+). Vacío = la del controlador.
+  timeZone: ""
+  # -- Número de copias que se conservan.
+  keep: 7
+  # -- Suspende el CronJob sin borrarlo.
+  suspend: false
+  # -- Qué hacer si coincide con una copia aún en curso.
+  concurrencyPolicy: Forbid
+  # -- Jobs correctos que se conservan.
+  successfulJobsHistoryLimit: 3
+  # -- Jobs fallidos que se conservan.
+  failedJobsHistoryLimit: 1
+  # -- Segundos de margen para lanzar una ejecución perdida.
+  startingDeadlineSeconds: ""
+  # -- Reintentos de cada Job.
+  backoffLimit: 2
+  # -- Tiempo máximo de cada Job en segundos.
+  activeDeadlineSeconds: 600
+  # -- Segundos que se conserva un Job terminado.
+  ttlSecondsAfterFinished: 86400
+  # -- Imagen con `sqlite3` y `sh`.
+  image:
+    registry: docker.io
+    repository: keinos/sqlite3
+    tag: "3.54.1"
+    digest: ""
+    pullPolicy: IfNotPresent
+  # -- Programa el Job en el mismo nodo que MercaStats (necesario con volúmenes ReadWriteOnce).
+  sameNodeAsApp: true
+  # -- Anotaciones de los pods de copia.
+  podAnnotations: {}
+  # -- Etiquetas de los pods de copia.
+  podLabels: {}
+  # -- Recursos del contenedor de copia.
+  resources: {}
+  # -- Selector de nodos del Job.
+  nodeSelector: {}
+  # -- Tolerancias del Job.
+  tolerations: []
+  # -- Afinidad del Job. Si se indica, sustituye a la de `sameNodeAsApp`.
+  affinity: {}
+  # Volumen de destino de las copias.
+  persistence:
+    # -- PVC ya existente.
+    existingClaim: ""
+    # -- Volumen propio (p. ej. `nfs: {...}`).
+    volume: {}
+    # -- StorageClass. Vacío = la por defecto; `"-"` = sin StorageClass.
+    storageClass: ""
+    # -- Modos de acceso del PVC.
+    accessModes:
+      - ReadWriteOnce
+    # -- Tamaño del PVC de copias.
+    size: 2Gi
+    annotations: {}
+    labels: {}
+    # -- Conserva el PVC de copias al desinstalar.
+    retain: true
+
+## @section Pruebas
+tests:
+  # -- Crea el pod de `helm test`, que comprueba `GET /api/health`.
+  enabled: true
+  # -- Imagen del test (necesita `wget`). Vacío = la propia imagen de MercaStats.
+  image:
+    registry: ""
+    repository: ""
+    tag: ""
+    digest: ""
+    pullPolicy: ""
+
+# -- Manifiestos adicionales que se despliegan con la release (admite plantillas).
+extraObjects: []
+# - apiVersion: v1
+#   kind: ConfigMap
+#   metadata:
+#     name: '{{ include "mercastats.fullname" . }}-extra'
+#   data:
+#     foo: bar

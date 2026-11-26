@@ -1,0 +1,15 @@
+# AUTH_MODE=proxy con un Secret y un PVC ya existentes, y NodePort.
+existingSecret: mercastats-secrets
+config:
+  auth:
+    mode: proxy
+    adminUser: usuario-authentik
+    proxy:
+      trustedProxies:
+        - 10.42.0.0/16
+persistence:
+  data:
+    existingClaim: mercastats-data
+service:
+  type: NodePort
+  nodePort: 30080

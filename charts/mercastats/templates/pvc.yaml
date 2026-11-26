@@ -1,0 +1,42 @@
+{{- $claims := list
+  (dict "key" "data" "persistence" .Values.persistence.data "enabled" .Values.persistence.data.enabled)
+  (dict "key" "inbox" "persistence" .Values.persistence.inbox "enabled" .Values.persistence.inbox.enabled)
+  (dict "key" "backup" "persistence" .Values.backup.persistence "enabled" .Values.backup.enabled) }}
+{{- range $claims }}
+{{- $p := .persistence }}
+{{- if include "mercastats.createClaim" (dict "enabled" .enabled "existingClaim" $p.existingClaim "volume" $p.volume) }}
+{{- $annotations := deepCopy ($p.annotations | default dict) }}
+{{- if $p.retain }}
+{{- $_ := set $annotations "helm.sh/resource-policy" "keep" }}
+{{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  {{- include "mercastats.metadata" (dict "context" $ "name" (include "mercastats.claimName" (dict "persistence" $p "suffix" .key "context" $)) "component" .key "labels" $p.labels "annotations" $annotations) | nindent 2 }}
+spec:
+  accessModes:
+    {{- toYaml $p.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ $p.size | quote }}
+  {{- if $p.storageClass }}
+  {{- if eq "-" (toString $p.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ tpl (toString $p.storageClass) $ | quote }}
+  {{- end }}
+  {{- end }}
+  {{- with $p.volumeName }}
+  volumeName: {{ . | quote }}
+  {{- end }}
+  {{- with $p.selector }}
+  selector:
+    {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{- end }}
+  {{- with $p.dataSource }}
+  dataSource:
+    {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

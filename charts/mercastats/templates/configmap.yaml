@@ -1,0 +1,57 @@
+{{- include "mercastats.validateValues" . }}
+{{- $c := .Values.config }}
+{{- $baseUrl := include "mercastats.baseUrl" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  {{- include "mercastats.metadata" (dict "context" $ "component" "server") | nindent 2 }}
+data:
+  HOST: {{ $c.host | default "0.0.0.0" | quote }}
+  PORT: {{ .Values.containerPort | quote }}
+  TZ: {{ $c.timezone | quote }}
+  LOG_LEVEL: {{ $c.logLevel | upper | quote }}
+  {{- with $baseUrl }}
+  BASE_URL: {{ . | quote }}
+  {{- end }}
+  {{- with $c.javaOpts }}
+  JAVA_OPTS: {{ tpl . $ | quote }}
+  {{- end }}
+  DATA_DIR: "/data"
+  DB_PATH: "/data/mercastats.db"
+  INBOX_DIR: "/data/inbox"
+  INBOX_POLL_SECONDS: {{ $c.inbox.pollSeconds | quote }}
+  {{- with $c.inbox.defaultUser }}
+  INBOX_DEFAULT_USER: {{ . | quote }}
+  {{- end }}
+  AUTH_MODE: {{ $c.auth.mode | lower | quote }}
+  ADMIN_USER: {{ $c.auth.adminUser | quote }}
+  ALLOW_REGISTRATION: {{ $c.auth.allowRegistration | toString | lower | quote }}
+  COOKIE_SECURE: {{ include "mercastats.cookieSecure" . | quote }}
+  SESSION_TTL_DAYS: {{ $c.auth.sessionTtlDays | quote }}
+  {{- if eq ($c.auth.mode | lower) "proxy" }}
+  PROXY_USER_HEADER: {{ $c.auth.proxy.userHeader | quote }}
+  PROXY_EMAIL_HEADER: {{ $c.auth.proxy.emailHeader | quote }}
+  PROXY_NAME_HEADER: {{ $c.auth.proxy.nameHeader | quote }}
+  TRUSTED_PROXIES: {{ join "," $c.auth.proxy.trustedProxies | quote }}
+  {{- end }}
+  {{- if $c.imap.enabled }}
+  IMAP_HOST: {{ $c.imap.host | quote }}
+  IMAP_SSL: {{ $c.imap.ssl | toString | lower | quote }}
+  {{- with $c.imap.port }}
+  IMAP_PORT: {{ . | quote }}
+  {{- end }}
+  IMAP_USER: {{ $c.imap.user | quote }}
+  IMAP_FOLDER: {{ $c.imap.folder | quote }}
+  IMAP_FROM_FILTER: {{ $c.imap.fromFilter | quote }}
+  IMAP_SYNC_INTERVAL_MINUTES: {{ $c.imap.syncIntervalMinutes | quote }}
+  {{- with $c.imap.targetUser }}
+  IMAP_TARGET_USER: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if $c.gmail.enabled }}
+  GMAIL_CLIENT_ID: {{ $c.gmail.clientId | quote }}
+  {{- with $c.gmail.redirectUri }}
+  GMAIL_REDIRECT_URI: {{ tpl . $ | quote }}
+  {{- end }}
+  GMAIL_SYNC_INTERVAL_MINUTES: {{ $c.gmail.syncIntervalMinutes | quote }}
+  {{- end }}

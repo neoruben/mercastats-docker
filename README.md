@@ -157,6 +157,7 @@ docker compose up -d
 
 - [docs/DOCKER.md](docs/DOCKER.md): todas las opciones, correo (Gmail e iCloud), uso detrás de authentik y API.
 - [docs/DESARROLLO.md](docs/DESARROLLO.md): para quien quiera modificar el código.
+- [charts/mercastats](charts/mercastats/README.md): instalación en Kubernetes con Helm.
 
 ## Apoya el proyecto
 

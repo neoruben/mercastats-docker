@@ -1,0 +1,20 @@
+# Patrones que no se empaquetan con `helm package`.
+.DS_Store
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.project
+.idea/
+*.tmproj
+.vscode/
+# Valores de prueba de chart-testing
+ci/

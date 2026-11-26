@@ -1,0 +1,78 @@
+{{- $fullname := include "mercastats.fullname" . }}
+{{- $ns := include "mercastats.namespace" . }}
+{{- $baseUrl := include "mercastats.baseUrl" . }}
+MercaStats {{ include "mercastats.imageTag" . }} desplegado como «{{ .Release.Name }}» en el namespace «{{ $ns }}».
+
+1. Acceso a la web:
+{{- if $baseUrl }}
+
+     {{ $baseUrl }}
+{{- else if .Values.httpRoute.enabled }}
+
+     HTTPRoute: {{ join ", " (.Values.httpRoute.hostnames | default (list "(sin hostnames)")) }}
+     (pon config.baseUrl con la URL pública para Gmail OAuth y COOKIE_SECURE automático)
+{{- else if and .Values.service.enabled (eq .Values.service.type "NodePort") }}
+
+     export NODE_PORT=$(kubectl get svc {{ $fullname }} -n {{ $ns }} -o jsonpath="{.spec.ports[0].nodePort}")
+     export NODE_IP=$(kubectl get nodes -o jsonpath="{.items[0].status.addresses[0].address}")
+     echo "http://$NODE_IP:$NODE_PORT"
+{{- else if and .Values.service.enabled (eq .Values.service.type "LoadBalancer") }}
+
+     La IP externa puede tardar unos minutos (kubectl get svc -w {{ $fullname }} -n {{ $ns }}):
+     export SERVICE_IP=$(kubectl get svc {{ $fullname }} -n {{ $ns }} -o jsonpath="{.status.loadBalancer.ingress[0]['ip','hostname']}")
+     echo "http://$SERVICE_IP:{{ .Values.service.port }}"
+{{- else }}
+
+     kubectl port-forward -n {{ $ns }} svc/{{ $fullname }} 8080:{{ .Values.service.port }}
+     y abre http://127.0.0.1:8080
+{{- end }}
+
+{{- if eq (.Values.config.auth.mode | lower) "local" }}
+
+2. Usuario administrador: «{{ .Values.config.auth.adminUser }}»
+{{- if or .Values.config.auth.adminPassword .Values.existingSecret }}
+   La contraseña es la del Secret «{{ include "mercastats.secretName" . }}» (clave {{ .Values.secretKeys.adminPassword }}).
+{{- else }}
+   No has puesto contraseña: se genera una en el primer arranque. Consúltala con:
+
+     kubectl logs -n {{ $ns }} deploy/{{ $fullname }} | grep -A1 "Contraseña generada"
+{{- end }}
+   Ojo: la contraseña solo cuenta en el PRIMER arranque; después se cambia desde la web.
+{{- else if eq (.Values.config.auth.mode | lower) "proxy" }}
+
+2. Autenticación delegada en tu proxy (cabecera {{ .Values.config.auth.proxy.userHeader }}).
+   Proxies de confianza: {{ join ", " .Values.config.auth.proxy.trustedProxies }}
+   Asegúrate de que nadie más puede llegar al pod (networkPolicy.enabled=true con networkPolicy.ingress.from).
+{{- else }}
+
+2. AVISO: config.auth.mode=none. Cualquiera que llegue a la web entra como «{{ .Values.config.auth.adminUser }}».
+{{- end }}
+
+3. Importar tickets: sube PDFs desde la web o cópialos a la carpeta vigilada:
+
+     kubectl cp ticket.pdf {{ $ns }}/$(kubectl get pod -n {{ $ns }} -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=server -o jsonpath='{.items[0].metadata.name}'):/data/inbox/
+{{- if .Values.config.imap.enabled }}
+   Sincronización IMAP activa: {{ .Values.config.imap.user }} en {{ .Values.config.imap.host }} cada {{ .Values.config.imap.syncIntervalMinutes }} min.
+{{- end }}
+{{- if .Values.config.gmail.enabled }}
+   Gmail OAuth activo. URI de redirección: {{ .Values.config.gmail.redirectUri | default (printf "%s/api/gmail/oauth/callback" $baseUrl) }}
+{{- end }}
+
+{{- if not .Values.persistence.data.enabled }}
+
+AVISO: persistence.data.enabled=false. La base de datos está en un emptyDir y SE PERDERÁ al reiniciar el pod.
+{{- end }}
+{{- if and .Values.config.auth.allowRegistration (eq (.Values.config.auth.mode | lower) "local") }}
+
+AVISO: el registro público está activado (config.auth.allowRegistration=true).
+{{- end }}
+{{- if .Values.backup.enabled }}
+
+Copias de seguridad: «{{ .Values.backup.schedule }}», se conservan {{ .Values.backup.keep }}. Lanzar una ahora:
+
+     kubectl create job -n {{ $ns }} --from=cronjob/{{ printf "%s-backup" $fullname | trunc 52 | trimSuffix "-" }} {{ $fullname | trunc 40 | trimSuffix "-" }}-backup-manual
+{{- end }}
+{{- if .Values.tests.enabled }}
+
+Comprobar la instalación:  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+{{- end }}
