@@ -48,9 +48,12 @@ MercaStats {{ include "mercastats.imageTag" . }} desplegado como «{{ .Release.N
 2. AVISO: config.auth.mode=none. Cualquiera que llegue a la web entra como «{{ .Values.config.auth.adminUser }}».
 {{- end }}
 
-3. Importar tickets: sube PDFs desde la web o cópialos a la carpeta vigilada:
+3. Importar tickets: sube PDFs desde la web o cópialos a la carpeta vigilada.
+   Cópialos primero fuera de inbox y muévelos después: si MercaStats ve un PDF a
+   medio copiar, lo da por erróneo y lo deja en inbox/failed.
 
-     kubectl cp ticket.pdf {{ $ns }}/$(kubectl get pod -n {{ $ns }} -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=server -o jsonpath='{.items[0].metadata.name}'):/data/inbox/
+     kubectl exec -i -n {{ $ns }} deploy/{{ $fullname }} -- sh -c 'cat > /data/ticket.pdf.part' < ticket.pdf
+     kubectl exec -n {{ $ns }} deploy/{{ $fullname }} -- mv /data/ticket.pdf.part /data/inbox/ticket.pdf
 {{- if .Values.config.imap.enabled }}
    Sincronización IMAP activa: {{ .Values.config.imap.user }} en {{ .Values.config.imap.host }} cada {{ .Values.config.imap.syncIntervalMinutes }} min.
 {{- end }}

@@ -91,7 +91,8 @@ spec:
                     echo "Aún no existe $DB; nada que copiar."
                     exit 0
                   fi
-                  DEST="/backup/mercastats-$(date +%Y%m%d-%H%M%S).db"
+                  # Hora en UTC (la imagen no trae zonas horarias), de ahí la Z del nombre.
+                  DEST="/backup/mercastats-$(date -u +%Y%m%d-%H%M%SZ).db"
                   # .backup es seguro con la base de datos en uso (modo WAL).
                   sqlite3 "$DB" ".backup '$DEST.tmp'"
                   if [ "$(sqlite3 "$DEST.tmp" 'PRAGMA integrity_check;')" != "ok" ]; then

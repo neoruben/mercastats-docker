@@ -187,6 +187,8 @@ nodeSelector:
 
 No pongas la base de datos (`persistence.data`) en NFS: SQLite necesita bloqueos de archivo fiables.
 
+Al dejar PDFs en la carpeta vigilada, cópialos primero con otro nombre o en otra carpeta y muévelos o renómbralos después. MercaStats importa un archivo en cuanto lleva 2 segundos sin cambiar, y si una copia lenta (por red, SMB o `kubectl`) se detiene ese tiempo, lo coge a medio copiar y lo deja en `inbox/failed`.
+
 ### Copias de seguridad
 
 ```yaml
@@ -199,19 +201,83 @@ backup:
     size: 2Gi
 ```
 
-El CronJob usa `sqlite3 .backup` (seguro con la base de datos en uso), comprueba la copia con `PRAGMA integrity_check` y borra las más antiguas. Como el volumen de datos suele ser `ReadWriteOnce`, el Job se programa en el mismo nodo que MercaStats (`backup.sameNodeAsApp`). Para lanzar una copia ahora:
+El CronJob usa `sqlite3 .backup` (seguro con la base de datos en uso), comprueba la copia con `PRAGMA integrity_check` y borra las más antiguas. Los nombres llevan la hora en UTC (`mercastats-20261126-120616Z.db`).
+
+Como el volumen de datos suele ser `ReadWriteOnce`, el Job se programa en el mismo nodo que MercaStats (`backup.sameNodeAsApp`). Además, el volumen de copias se monta en solo lectura en `/backups` del pod de MercaStats (`backup.mountInApp`). Así el PVC se enlaza al instalar, también con StorageClasses `WaitForFirstConsumer`, y `helm install --wait` o Argo CD no se quedan esperando a la primera copia. De paso, las copias se pueden ver sin pods extra:
+
+```bash
+kubectl exec -n mercastats deploy/mercastats -- ls -l /backups
+```
+
+Para lanzar una copia ahora:
 
 ```bash
 kubectl create job -n mercastats --from=cronjob/mercastats-backup mercastats-backup-manual
 ```
 
-**Restaurar una copia:**
+**Restaurar una copia.** Para MercaStats:
 
 ```bash
 kubectl scale -n mercastats deploy/mercastats --replicas=0
 ```
 
-Monta los dos PVC en un pod temporal (`mercastats-data` y `mercastats-backup`), copia la copia elegida sobre `/data/mercastats.db`, borra `/data/mercastats.db-wal` y `/data/mercastats.db-shm` si existen, y vuelve a arrancar:
+Crea un pod temporal con los dos volúmenes (cambia `mercastats-data` y `mercastats-backup` si tu release no se llama `mercastats`):
+
+```yaml
+# restore.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mercastats-restore
+  namespace: mercastats
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: restore
+      image: ghcr.io/neoruben/mercastats:0.2.0
+      command: ["sleep", "3600"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: backup
+          mountPath: /backups
+          readOnly: true
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: mercastats-data
+    - name: backup
+      persistentVolumeClaim:
+        claimName: mercastats-backup
+```
+
+```bash
+kubectl apply -f restore.yaml
+```
+
+Copia la copia elegida sobre la base de datos (con MercaStats parado no debe haber archivos `mercastats.db-wal` ni `mercastats.db-shm` en `/data`):
+
+```bash
+kubectl exec -n mercastats mercastats-restore -- sh -c 'cp /backups/mercastats-20261126-120616Z.db /data/mercastats.db.new && mv /data/mercastats.db.new /data/mercastats.db'
+```
+
+Borra el pod temporal y vuelve a arrancar MercaStats:
+
+```bash
+kubectl delete pod -n mercastats mercastats-restore
+```
 
 ```bash
 kubectl scale -n mercastats deploy/mercastats --replicas=1
@@ -242,7 +308,7 @@ Por defecto el pod:
 helm uninstall mercastats -n mercastats
 ```
 
-Los PVC **se conservan** (`persistence.data.retain: true`) para no perder la base de datos por accidente. Si de verdad quieres borrarlos:
+Los PVC **se conservan** (`persistence.data.retain: true`) para no perder la base de datos por accidente. Si vuelves a instalar con el mismo nombre de release, Helm los reutiliza y MercaStats arranca con los datos que tenía (y con la contraseña de `admin` de entonces). Si de verdad quieres borrarlos:
 
 ```bash
 kubectl delete pvc -n mercastats -l app.kubernetes.io/instance=mercastats
@@ -492,6 +558,7 @@ Todos los valores, con comentarios, están en [values.yaml](values.yaml). Cada o
 | `backup.ttlSecondsAfterFinished` | `86400` | Segundos que se conserva un Job terminado. |
 | `backup.image` | `ver values.yaml` | Imagen con `sqlite3` y `sh`. |
 | `backup.sameNodeAsApp` | `true` | Programa el Job en el mismo nodo que MercaStats (necesario con volúmenes ReadWriteOnce). |
+| `backup.mountInApp` | `true` | Monta también el volumen de copias, en solo lectura, en /backups del pod de MercaStats. Así el PVC se enlaza al instalar (con `WaitForFirstConsumer` no se enlazaría hasta la primera copia y `helm --wait` o Argo CD se quedarían esperando) y las copias se pueden ver con `kubectl exec`. |
 | `backup.podAnnotations` | `{}` | Anotaciones de los pods de copia. |
 | `backup.podLabels` | `{}` | Etiquetas de los pods de copia. |
 | `backup.resources` | `{}` | Recursos del contenedor de copia. |

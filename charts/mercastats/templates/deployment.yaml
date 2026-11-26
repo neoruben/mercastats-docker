@@ -217,6 +217,12 @@ spec:
             {{- end }}
             - name: tmp
               mountPath: /tmp
+            {{- if and .Values.backup.enabled .Values.backup.mountInApp }}
+            # Copias de seguridad, solo lectura: el PVC se enlaza al instalar y en este mismo nodo.
+            - name: backup
+              mountPath: /backups
+              readOnly: true
+            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
             {{- end }}
@@ -239,6 +245,10 @@ spec:
           {{- with .Values.tmpVolume.medium }}{{ $_ := set $tmp "medium" . }}{{ end }}
           {{- with .Values.tmpVolume.sizeLimit }}{{ $_ := set $tmp "sizeLimit" . }}{{ end }}
           emptyDir: {{- if $tmp }}{{ toYaml $tmp | nindent 12 }}{{ else }} {}{{ end }}
+        {{- if and .Values.backup.enabled .Values.backup.mountInApp }}
+        - name: backup
+          {{- include "mercastats.volumeSource" (dict "persistence" .Values.backup.persistence "suffix" "backup" "context" $) | trim | nindent 10 }}
+        {{- end }}
         {{- with .Values.extraVolumes }}
         {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
         {{- end }}

@@ -1084,6 +1084,9 @@
               "type": "boolean"
             }
           }
+        },
+        "mountInApp": {
+          "type": "boolean"
         }
       }
     },

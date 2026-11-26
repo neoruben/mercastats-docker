@@ -519,6 +519,11 @@ backup:
     pullPolicy: IfNotPresent
   # -- Programa el Job en el mismo nodo que MercaStats (necesario con volúmenes ReadWriteOnce).
   sameNodeAsApp: true
+  # -- Monta también el volumen de copias, en solo lectura, en /backups del pod de
+  # MercaStats. Así el PVC se enlaza al instalar (con `WaitForFirstConsumer` no se
+  # enlazaría hasta la primera copia y `helm --wait` o Argo CD se quedarían esperando)
+  # y las copias se pueden ver con `kubectl exec`.
+  mountInApp: true
   # -- Anotaciones de los pods de copia.
   podAnnotations: {}
   # -- Etiquetas de los pods de copia.
