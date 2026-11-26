@@ -1,0 +1,134 @@
+# Activa casi todas las funciones del chart (chart-testing / helm template).
+global:
+  imagePullSecrets:
+    - regcred
+imagePullSecrets:
+  - name: regcred
+  - other
+commonLabels:
+  team: home
+commonAnnotations:
+  owner: "{{ .Release.Name }}"
+config:
+  timezone: Europe/Madrid
+  logLevel: debug
+  auth:
+    mode: local
+    adminPassword: cambia-esto
+    cookieSecure: auto
+  imap:
+    enabled: true
+    host: imap.gmail.com
+    user: usuario@example.com
+    password: abcd efgh ijkl mnop
+    folder: Tickets/Mercadona
+  gmail:
+    enabled: true
+    clientId: id.apps.googleusercontent.com
+    clientSecret: secreto
+extraEnv:
+  - name: EXTRA
+    value: "{{ .Release.Name }}"
+extraEnvFrom:
+  - secretRef:
+      name: extra
+      optional: true
+podAnnotations:
+  example.com/a: b
+podLabels:
+  example.com/l: v
+priorityClassName: low
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: mercastats
+tolerations:
+  - key: arm
+    operator: Exists
+    effect: NoSchedule
+nodeSelector:
+  kubernetes.io/arch: arm64
+volumePermissions:
+  enabled: true
+persistence:
+  data:
+    storageClass: "-"
+    size: 2Gi
+    subPath: mercastats
+  inbox:
+    enabled: true
+    volume:
+      nfs:
+        server: nas.lan
+        path: /export/tickets
+tmpVolume:
+  medium: Memory
+  sizeLimit: 128Mi
+service:
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 192.168.0.0/16
+  externalTrafficPolicy: Local
+  ipFamilyPolicy: PreferDualStack
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+  hosts:
+    - host: mercastats.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: mercastats-tls
+      hosts:
+        - mercastats.example.com
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - mercastats.example.com
+networkPolicy:
+  enabled: true
+  ingress:
+    from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress-nginx
+  egress:
+    enabled: true
+backup:
+  enabled: true
+  timeZone: Europe/Madrid
+  keep: 14
+sidecars:
+  - name: sidecar
+    image: busybox:1.36
+    command: ["sleep", "infinity"]
+initContainers:
+  - name: hello
+    image: busybox:1.36
+    command: ["true"]
+extraVolumes:
+  - name: extra
+    configMap:
+      name: '{{ include "mercastats.fullname" . }}-extra'
+extraVolumeMounts:
+  - name: extra
+    mountPath: /extra
+    readOnly: true
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: '{{ include "mercastats.fullname" . }}-extra'
+    data:
+      foo: bar

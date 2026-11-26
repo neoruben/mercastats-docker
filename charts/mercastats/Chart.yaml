@@ -1,0 +1,29 @@
+apiVersion: v2
+name: mercastats
+description: >-
+  MercaStats self-hosted: estadísticas de tus tickets de Mercadona en PDF, con
+  importación por correo (IMAP / Gmail OAuth), carpeta vigilada y subida web.
+type: application
+# Versión del chart (SemVer). Súbela con cada cambio del chart.
+version: 0.1.0
+# Versión de la aplicación (etiqueta de la imagen por defecto).
+appVersion: "0.2.0"
+kubeVersion: ">=1.21.0-0"
+home: https://github.com/neoruben/mercastats-docker
+sources:
+  - https://github.com/neoruben/mercastats-docker
+keywords:
+  - mercastats
+  - mercadona
+  - tickets
+  - receipts
+  - self-hosted
+  - sqlite
+annotations:
+  artifacthub.io/containsSecurityUpdates: "false"
+  artifacthub.io/images: |
+    - name: mercastats
+      image: ghcr.io/neoruben/mercastats:0.2.0
+      platforms:
+        - linux/amd64
+        - linux/arm64

@@ -1,0 +1,139 @@
+{{- if .Values.backup.enabled }}
+{{- $b := .Values.backup }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  {{- include "mercastats.metadata" (dict "context" $ "name" (printf "%s-backup" (include "mercastats.fullname" .) | trunc 52 | trimSuffix "-") "component" "backup") | nindent 2 }}
+spec:
+  schedule: {{ $b.schedule | quote }}
+  {{- with $b.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  suspend: {{ $b.suspend }}
+  concurrencyPolicy: {{ $b.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ $b.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $b.failedJobsHistoryLimit }}
+  {{- with $b.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ . }}
+  {{- end }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "mercastats.labels" . | nindent 8 }}
+        app.kubernetes.io/component: backup
+    spec:
+      backoffLimit: {{ $b.backoffLimit }}
+      {{- with $b.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ . }}
+      {{- end }}
+      {{- with $b.ttlSecondsAfterFinished }}
+      ttlSecondsAfterFinished: {{ . }}
+      {{- end }}
+      template:
+        metadata:
+          labels:
+            {{- include "mercastats.labels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+            {{- with $b.podLabels }}
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
+          {{- with $b.podAnnotations }}
+          annotations:
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+        spec:
+          restartPolicy: OnFailure
+          {{- with (include "mercastats.imagePullSecrets" . | trim) }}
+          {{- . | nindent 10 }}
+          {{- end }}
+          serviceAccountName: {{ include "mercastats.serviceAccountName" . }}
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          {{- with (include "mercastats.securityContext" (dict "secContext" .Values.podSecurityContext "context" $)) }}
+          securityContext:
+            {{- . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.priorityClassName }}
+          priorityClassName: {{ . | quote }}
+          {{- end }}
+          {{- with $b.nodeSelector }}
+          nodeSelector:
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if $b.affinity }}
+          affinity:
+            {{- include "mercastats.tplvalues.render" (dict "value" $b.affinity "context" $) | nindent 12 }}
+          {{- else if $b.sameNodeAsApp }}
+          # Mismo nodo que MercaStats: un volumen ReadWriteOnce solo se monta en un nodo.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      {{- include "mercastats.selectorLabels" . | nindent 22 }}
+                      app.kubernetes.io/component: server
+          {{- end }}
+          {{- with $b.tolerations }}
+          tolerations:
+            {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: backup
+              image: {{ include "mercastats.image" (dict "image" $b.image "context" $ "defaultTag" "latest") }}
+              imagePullPolicy: {{ $b.image.pullPolicy }}
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  DB=/data/mercastats.db
+                  if [ ! -f "$DB" ]; then
+                    echo "Aún no existe $DB; nada que copiar."
+                    exit 0
+                  fi
+                  # Hora en UTC (la imagen no trae zonas horarias), de ahí la Z del nombre.
+                  DEST="/backup/mercastats-$(date -u +%Y%m%d-%H%M%SZ).db"
+                  # .backup es seguro con la base de datos en uso (modo WAL).
+                  sqlite3 "$DB" ".backup '$DEST.tmp'"
+                  if [ "$(sqlite3 "$DEST.tmp" 'PRAGMA integrity_check;')" != "ok" ]; then
+                    echo "La copia no supera integrity_check" >&2
+                    rm -f "$DEST.tmp"
+                    exit 1
+                  fi
+                  mv "$DEST.tmp" "$DEST"
+                  echo "Copia creada: $DEST"
+                  ls -1t /backup/mercastats-*.db | tail -n +$((KEEP + 1)) | while read -r old; do
+                    echo "Borrando copia antigua: $old"
+                    rm -f -- "$old"
+                  done
+              env:
+                - name: KEEP
+                  value: {{ $b.keep | int | toString | quote }}
+                - name: HOME
+                  value: /tmp
+              {{- with (include "mercastats.securityContext" (dict "secContext" .Values.securityContext "context" $)) }}
+              securityContext:
+                {{- . | nindent 16 }}
+              {{- end }}
+              {{- with $b.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                  {{- with .Values.persistence.data.subPath }}
+                  subPath: {{ . }}
+                  {{- end }}
+                - name: backup
+                  mountPath: /backup
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: data
+              {{- include "mercastats.volumeSource" (dict "persistence" .Values.persistence.data "suffix" "data" "context" $) | trim | nindent 14 }}
+            - name: backup
+              {{- include "mercastats.volumeSource" (dict "persistence" $b.persistence "suffix" "backup" "context" $) | trim | nindent 14 }}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

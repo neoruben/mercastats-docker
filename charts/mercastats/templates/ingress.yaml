@@ -1,0 +1,41 @@
+{{- if .Values.ingress.enabled }}
+{{- $fullname := include "mercastats.fullname" . }}
+{{- $port := .Values.service.port }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  {{- include "mercastats.metadata" (dict "context" $ "component" "server" "labels" .Values.ingress.labels "annotations" .Values.ingress.annotations) | nindent 2 }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ tpl . $ }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- range . }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ tpl (toString .) $ | quote }}
+        {{- end }}
+      {{- with .secretName }}
+      secretName: {{ tpl (toString .) $ }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - {{- with .host }}
+      host: {{ tpl (toString .) $ | quote }}
+      {{- end }}
+      http:
+        paths:
+          {{- range (.paths | default (list (dict "path" "/" "pathType" "Prefix"))) }}
+          - path: {{ .path | default "/" }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ $fullname }}
+                port:
+                  number: {{ $port }}
+          {{- end }}
+    {{- end }}
+{{- end }}

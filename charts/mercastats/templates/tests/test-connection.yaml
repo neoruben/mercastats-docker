@@ -1,0 +1,47 @@
+{{- if and .Values.tests.enabled .Values.service.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  {{- include "mercastats.metadata" (dict "context" $ "name" (printf "%s-test" (include "mercastats.fullname" .) | trunc 63 | trimSuffix "-") "component" "test" "annotations" (dict "helm.sh/hook" "test" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded")) | nindent 2 }}
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  {{- with (include "mercastats.imagePullSecrets" . | trim) }}
+  {{- . | nindent 2 }}
+  {{- end }}
+  {{- with (include "mercastats.securityContext" (dict "secContext" (omit (.Values.podSecurityContext | default dict) "fsGroup" "fsGroupChangePolicy") "context" $)) }}
+  securityContext:
+    {{- . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.nodeSelector }}
+  nodeSelector:
+    {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- include "mercastats.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{- end }}
+  containers:
+    - name: wget
+      image: {{ include "mercastats.auxImage" (dict "image" .Values.tests.image "context" $) }}
+      imagePullPolicy: {{ include "mercastats.auxPullPolicy" (dict "image" .Values.tests.image "context" $) }}
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          URL="http://{{ include "mercastats.fullname" . }}.{{ include "mercastats.namespace" . }}.svc:{{ .Values.service.port }}/api/health"
+          echo "GET $URL"
+          wget -q -T 10 -O - "$URL" | grep -q '"ok"'
+          echo "MercaStats responde correctamente."
+      {{- with (include "mercastats.securityContext" (dict "secContext" .Values.securityContext "context" $)) }}
+      securityContext:
+        {{- . | nindent 8 }}
+      {{- end }}
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+{{- end }}
